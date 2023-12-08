@@ -1,4 +1,4 @@
-package swervelib.encoders;
+package frc.robot.swervelib.encoders;
 
 import com.revrobotics.AbsoluteEncoder;
 import com.revrobotics.CANSparkMax;

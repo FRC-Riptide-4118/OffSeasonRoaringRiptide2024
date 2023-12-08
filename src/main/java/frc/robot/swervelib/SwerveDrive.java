@@ -1,4 +1,4 @@
-package swervelib;
+package frc.robot.swervelib;
 
 import edu.wpi.first.math.Matrix;
 import edu.wpi.first.math.VecBuilder;
