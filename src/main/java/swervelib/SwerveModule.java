@@ -4,7 +4,6 @@ import edu.wpi.first.math.controller.SimpleMotorFeedforward;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
-import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import swervelib.encoders.SwerveAbsoluteEncoder;
 import swervelib.math.SwerveMath;
@@ -25,6 +24,10 @@ public class SwerveModule
    */
   public final  SwerveModuleConfiguration configuration;
   /**
+   * Angle offset from the absolute encoder.
+   */
+  private final double                    angleOffset;
+  /**
    * Swerve Motors.
    */
   private final SwerveMotor               angleMotor, driveMotor;
@@ -35,47 +38,36 @@ public class SwerveModule
   /**
    * Module number for kinematics, usually 0 to 3. front left -> front right -> back left -> back right.
    */
-  public        int                    moduleNumber;
+  public  int                    moduleNumber;
   /**
    * Feedforward for drive motor during closed loop control.
    */
-  public        SimpleMotorFeedforward feedforward;
-  /**
-   * Maximum speed of the drive motors in meters per second.
-   */
-  public        double                 maxSpeed;
+  public  SimpleMotorFeedforward feedforward;
   /**
    * Last swerve module state applied.
    */
-  public        SwerveModuleState      lastState;
+  public  SwerveModuleState      lastState;
   /**
    * Enable {@link SwerveModuleState} optimizations so the angle is reversed and speed is reversed to ensure the module
    * never turns more than 90deg.
    */
-  public        boolean                moduleStateOptimization  = true;
-  /**
-   * Angle offset from the absolute encoder.
-   */
-  private       double                    angleOffset;
+  public  boolean                moduleStateOptimization  = true;
   /**
    * Simulated swerve module.
    */
-  private       SwerveModuleSimulation simModule;
+  private SwerveModuleSimulation simModule;
   /**
    * Encoder synchronization queued.
    */
-  private       boolean                synchronizeEncoderQueued = false;
+  private boolean                synchronizeEncoderQueued = false;
 
   /**
    * Construct the swerve module and initialize the swerve module motors and absolute encoder.
    *
    * @param moduleNumber        Module number for kinematics.
    * @param moduleConfiguration Module constants containing CAN ID's and offsets.
-   * @param driveFeedforward    Drive motor feedforward created by
-   *                            {@link SwerveMath#createDriveFeedforward(double, double, double)}.
    */
-  public SwerveModule(int moduleNumber, SwerveModuleConfiguration moduleConfiguration,
-                      SimpleMotorFeedforward driveFeedforward)
+  public SwerveModule(int moduleNumber, SwerveModuleConfiguration moduleConfiguration)
   {
     //    angle = 0;
     //    speed = 0;
@@ -86,7 +78,7 @@ public class SwerveModule
     angleOffset = moduleConfiguration.angleOffset;
 
     // Initialize Feedforward for drive motor.
-    feedforward = driveFeedforward;
+    feedforward = configuration.createDriveFeedforward();
 
     // Create motors from configuration and reset them to defaults.
     angleMotor = moduleConfiguration.angleMotor;
@@ -112,14 +104,14 @@ public class SwerveModule
     }
 
     // Config angle motor/controller
-    angleMotor.configureIntegratedEncoder(moduleConfiguration.conversionFactors.angle);
+    angleMotor.configureIntegratedEncoder(moduleConfiguration.getPositionEncoderConversion(false));
     angleMotor.configurePIDF(moduleConfiguration.anglePIDF);
     angleMotor.configurePIDWrapping(-180, 180);
     angleMotor.setInverted(moduleConfiguration.angleMotorInverted);
     angleMotor.setMotorBrake(false);
 
     // Config drive motor/controller
-    driveMotor.configureIntegratedEncoder(moduleConfiguration.conversionFactors.drive);
+    driveMotor.configureIntegratedEncoder(moduleConfiguration.getPositionEncoderConversion(true));
     driveMotor.configurePIDF(moduleConfiguration.velocityPIDF);
     driveMotor.setInverted(moduleConfiguration.driveMotorInverted);
     driveMotor.setMotorBrake(true);
@@ -134,27 +126,6 @@ public class SwerveModule
 
     lastState = getState();
   }
-
-  /**
-   * Set the voltage compensation for the swerve module motor.
-   *
-   * @param optimalVoltage Nominal voltage for operation to output to.
-   */
-  public void setAngleMotorVoltageCompensation(double optimalVoltage)
-  {
-    angleMotor.setVoltageCompensation(optimalVoltage);
-  }
-
-  /**
-   * Set the voltage compensation for the swerve module motor.
-   *
-   * @param optimalVoltage Nominal voltage for operation to output to.
-   */
-  public void setDriveMotorVoltageCompensation(double optimalVoltage)
-  {
-    driveMotor.setVoltageCompensation(optimalVoltage);
-  }
-
 
   /**
    * Queue synchronization of the integrated angle encoder with the absolute encoder.
@@ -186,7 +157,7 @@ public class SwerveModule
 
     if (isOpenLoop)
     {
-      double percentOutput = desiredState.speedMetersPerSecond / maxSpeed;
+      double percentOutput = desiredState.speedMetersPerSecond / configuration.maxSpeed;
       driveMotor.set(percentOutput);
     } else
     {
@@ -201,7 +172,7 @@ public class SwerveModule
     if (!force)
     {
       // Prevents module rotation if speed is less than 1%
-      SwerveMath.antiJitter(desiredState, lastState, Math.min(maxSpeed, 4));
+      SwerveMath.antiJitter(desiredState, lastState, Math.min(configuration.maxSpeed, 4));
     }
 
     if (SwerveDriveTelemetry.verbosity == TelemetryVerbosity.HIGH)
@@ -254,10 +225,12 @@ public class SwerveModule
   {
     double     velocity;
     Rotation2d azimuth;
+    double     omega;
     if (!SwerveDriveTelemetry.isSimulation)
     {
       velocity = driveMotor.getVelocity();
-      azimuth = Rotation2d.fromDegrees(getAbsolutePosition());
+      azimuth = Rotation2d.fromDegrees(angleMotor.getPosition());
+      omega = Math.toRadians(angleMotor.getVelocity());
     } else
     {
       return simModule.getState();
@@ -277,7 +250,7 @@ public class SwerveModule
     if (!SwerveDriveTelemetry.isSimulation)
     {
       position = driveMotor.getPosition();
-      azimuth = Rotation2d.fromDegrees(getAbsolutePosition());
+      azimuth = Rotation2d.fromDegrees(angleMotor.getPosition());
     } else
     {
       return simModule.getPosition();
@@ -338,28 +311,6 @@ public class SwerveModule
   }
 
   /**
-   * Set the conversion factor for the angle/azimuth motor controller.
-   *
-   * @param conversionFactor Angle motor conversion factor for PID, should be generated from
-   *                         {@link SwerveMath#calculateDegreesPerSteeringRotation(double, double)} or calculated.
-   */
-  public void setAngleMotorConversionFactor(double conversionFactor)
-  {
-    angleMotor.configureIntegratedEncoder(conversionFactor);
-  }
-
-  /**
-   * Set the conversion factor for the drive motor controller.
-   *
-   * @param conversionFactor Drive motor conversion factor for PID, should be generated from
-   *                         {@link SwerveMath#calculateMetersPerRotation(double, double, double)} or calculated.
-   */
-  public void setDriveMotorConversionFactor(double conversionFactor)
-  {
-    driveMotor.configureIntegratedEncoder(conversionFactor);
-  }
-
-  /**
    * Get the angle {@link SwerveMotor} for the {@link SwerveModule}.
    *
    * @return {@link SwerveMotor} for the angle/steering motor of the module.
@@ -387,51 +338,5 @@ public class SwerveModule
   public SwerveModuleConfiguration getConfiguration()
   {
     return configuration;
-  }
-
-  /**
-   * Push absolute encoder offset in the memory of the encoder or controller. Also removes the internal angle offset.
-   */
-  public void pushOffsetsToControllers()
-  {
-    if (absoluteEncoder != null)
-    {
-      if (absoluteEncoder.setAbsoluteEncoderOffset(angleOffset))
-      {
-        angleOffset = 0;
-      } else
-      {
-        DriverStation.reportWarning(
-            "Pushing the Absolute Encoder offset to the encoder failed on module #" + moduleNumber, false);
-      }
-    } else
-    {
-      DriverStation.reportWarning("There is no Absolute Encoder on module #" + moduleNumber, false);
-    }
-  }
-
-  /**
-   * Restore internal offset in YAGSL and either sets absolute encoder offset to 0 or restores old value.
-   */
-  public void restoreInternalOffset()
-  {
-    absoluteEncoder.setAbsoluteEncoderOffset(0);
-    angleOffset = configuration.angleOffset;
-  }
-
-  /**
-   * Get if the last Absolute Encoder had a read issue, such as it does not exist.
-   *
-   * @return If the last Absolute Encoder had a read issue, or absolute encoder does not exist.
-   */
-  public boolean getAbsoluteEncoderReadIssue()
-  {
-    if (absoluteEncoder == null)
-    {
-      return true;
-    } else
-    {
-      return absoluteEncoder.readingError;
-    }
   }
 }

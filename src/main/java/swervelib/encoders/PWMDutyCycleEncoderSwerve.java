@@ -1,6 +1,5 @@
 package swervelib.encoders;
 
-import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.DutyCycleEncoder;
 
 /**
@@ -67,18 +66,6 @@ public class PWMDutyCycleEncoderSwerve extends SwerveAbsoluteEncoder
   }
 
   /**
-   * Get the velocity in degrees/sec.
-   *
-   * @return velocity in degrees/sec.
-   */
-  @Override
-  public double getVelocity()
-  {
-    DriverStation.reportWarning("The PWM Duty Cycle encoder may not report accurate velocities!", true);
-    return encoder.get();
-  }
-
-  /**
    * Reset the encoder to factory defaults.
    */
   @Override
@@ -96,17 +83,4 @@ public class PWMDutyCycleEncoderSwerve extends SwerveAbsoluteEncoder
     // Do nothing
   }
 
-  /**
-   * Sets the offset of the Encoder in the WPILib Encoder Library.
-   *
-   * @param offset the offset the Absolute Encoder uses as the zero point.
-   * @return Always true due to no external device commands.
-   */
-  @Override
-  public boolean setAbsoluteEncoderOffset(double offset)
-  {
-    encoder.setPositionOffset(offset);
-
-    return true;
-  }
 }

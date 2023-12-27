@@ -1,5 +1,6 @@
 package swervelib.parser.json;
 
+import edu.wpi.first.math.util.Units;
 import swervelib.parser.SwerveModulePhysicalCharacteristics;
 
 /**
@@ -8,13 +9,18 @@ import swervelib.parser.SwerveModulePhysicalCharacteristics;
 public class PhysicalPropertiesJson
 {
 
-
   /**
-   * Conversion factor applied to the motor controllers PID loops. Can be calculated with
-   * {@link swervelib.math.SwerveMath#calculateDegreesPerSteeringRotation(double, double)} for angle motors or
-   * {@link swervelib.math.SwerveMath#calculateMetersPerRotation(double, double, double)} for drive motors.
+   * Wheel diameter in inches.
    */
-  public MotorConfigDouble conversionFactor               = new MotorConfigDouble(0, 0);
+  public double            wheelDiameter;
+  /**
+   * Gear ratio for the motors, number of times the motor has to spin before the wheel rotates a single time.
+   */
+  public MotorConfigDouble gearRatio;
+  /**
+   * Encoder pulse per rotation for non-integrated encoders. 1 for integrated encoders.
+   */
+  public MotorConfigInt    encoderPulsePerRotation        = new MotorConfigInt(1, 1);
   /**
    * The current limit in AMPs to apply to the motors.
    */
@@ -27,26 +33,96 @@ public class PhysicalPropertiesJson
    * The grip tape coefficient of friction on carpet. Used to calculate the practical maximum acceleration.
    */
   public double            wheelGripCoefficientOfFriction = 1.19;
-  /**
-   * The voltage to use for the smart motor voltage compensation, default is 12.
-   */
-  public double            optimalVoltage                 = 12;
 
   /**
    * Create the physical characteristics based off the parsed data.
    *
+   * @param optimalVoltage Optimal voltage to compensate for and use to calculate drive motor feedforward.
    * @return {@link SwerveModulePhysicalCharacteristics} based on parsed data.
    */
-  public SwerveModulePhysicalCharacteristics createPhysicalProperties()
+  public SwerveModulePhysicalCharacteristics createPhysicalProperties(double optimalVoltage)
   {
     return new SwerveModulePhysicalCharacteristics(
-        conversionFactor,
+        gearRatio.drive,
+        gearRatio.angle,
+        Units.inchesToMeters(wheelDiameter),
         wheelGripCoefficientOfFriction,
         optimalVoltage,
         currentLimit.drive,
         currentLimit.angle,
         rampRate.drive,
-        rampRate.angle);
+        rampRate.angle,
+        encoderPulsePerRotation.drive,
+        encoderPulsePerRotation.angle);
   }
 }
 
+/**
+ * Used to store doubles for motor configuration.
+ */
+class MotorConfigDouble
+{
+
+  /**
+   * Drive motor.
+   */
+  public double drive;
+  /**
+   * Angle motor.
+   */
+  public double angle;
+
+  /**
+   * Default constructor.
+   */
+  public MotorConfigDouble()
+  {
+  }
+
+  /**
+   * Default constructor.
+   *
+   * @param angle Angle data.
+   * @param drive Drive data.
+   */
+  public MotorConfigDouble(double angle, double drive)
+  {
+    this.angle = angle;
+    this.drive = drive;
+  }
+}
+
+/**
+ * Used to store ints for motor configuration.
+ */
+class MotorConfigInt
+{
+
+  /**
+   * Drive motor.
+   */
+  public int drive;
+  /**
+   * Angle motor.
+   */
+  public int angle;
+
+  /**
+   * Default constructor.
+   */
+  public MotorConfigInt()
+  {
+  }
+
+  /**
+   * Default constructor with values.
+   *
+   * @param drive Drive data.
+   * @param angle Angle data.
+   */
+  public MotorConfigInt(int drive, int angle)
+  {
+    this.angle = angle;
+    this.drive = drive;
+  }
+}
